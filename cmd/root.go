@@ -64,7 +64,7 @@ func run(cmd *cobra.Command, args []string) {
 		}
 		split := strings.Split(text, ";")
 		if len(split) < 2 {
-			cobra.CheckErr(fmt.Sprintf("failed to parse the search term %s", searchTerm))
+			cobra.CheckErr(fmt.Errorf("failed to parse the search term %s", searchTerm))
 		}
 		k, v := strings.TrimSpace(split[0]), strings.TrimSpace(split[1])
 		if *exact {
@@ -82,7 +82,7 @@ func run(cmd *cobra.Command, args []string) {
 		// pad the unicode value with zeros so it will be valid unicode hex value
 		s := fmt.Sprintf("'\\U%08s'", code)
 		unquote, err := strconv.Unquote(s)
-		cobra.CheckErr(fmt.Errorf("err unquoting using %s %w", s, err))
+		cobra.CheckErr(err)
 		fmt.Printf("%s", unquote)
 		if *printUnicodeValue {
 			fmt.Printf("\t%s", s)
