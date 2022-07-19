@@ -13,11 +13,10 @@ import (
 )
 
 var (
-	exact                   *bool
-	printUnicodeValue       *bool
-	printUnicodeDescription *bool
-	//db                      = "/home/rgolan/Downloads/UCD/extracted/DerivedName.txt"
-	dbFile *string
+	exact                   bool
+	printUnicodeValue       bool
+	printUnicodeDescription bool
+	dbFile                  string
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -49,10 +48,12 @@ func run(cmd *cobra.Command, args []string) {
 	searchTerm := strings.ToUpper(strings.Join(args, " "))
 
 	var reader io.Reader
-	if *dbFile != "" {
-		reader, err := os.Open(*dbFile)
+	if dbFile != "" {
+		fmt.Printf("db file %v\n", dbFile)
+		fd, err := os.Open(dbFile)
 		cobra.CheckErr(err)
-		defer reader.Close()
+		defer fd.Close()
+		reader = fd
 	} else {
 		reader = strings.NewReader(data.DB)
 	}
@@ -67,7 +68,7 @@ func run(cmd *cobra.Command, args []string) {
 			cobra.CheckErr(fmt.Errorf("failed to parse the search term %s", searchTerm))
 		}
 		k, v := strings.TrimSpace(split[0]), strings.TrimSpace(split[1])
-		if *exact {
+		if exact {
 			if v == searchTerm {
 				results[k] = v
 			}
@@ -84,10 +85,10 @@ func run(cmd *cobra.Command, args []string) {
 		unquote, err := strconv.Unquote(s)
 		cobra.CheckErr(err)
 		fmt.Printf("%s", unquote)
-		if *printUnicodeValue {
+		if printUnicodeValue {
 			fmt.Printf("\t%s", s)
 		}
-		if *printUnicodeDescription {
+		if printUnicodeDescription {
 			fmt.Printf("\t%s", desc)
 		}
 		fmt.Println()
@@ -95,8 +96,8 @@ func run(cmd *cobra.Command, args []string) {
 }
 
 func init() {
-	exact = rootCmd.Flags().BoolP("exact-match", "e", false, "Exact match the search term")
-	printUnicodeValue = rootCmd.Flags().BoolP("print-unicode", "p", false, "Print the unicode value")
-	printUnicodeDescription = rootCmd.Flags().BoolP("print-description", "d", false, "Print the unicode description")
-	dbFile = rootCmd.Flags().StringP("db-file", "f", "", "A file containing extracted unicode mapping in the form of [unicode] ; [description]")
+	rootCmd.Flags().BoolVarP(&exact, "exact-match", "e", false, "Exact match the search term")
+	rootCmd.Flags().BoolVarP(&printUnicodeValue, "print-unicode", "p", false, "Print the unicode value")
+	rootCmd.Flags().BoolVarP(&printUnicodeDescription, "print-description", "d", false, "Print the unicode description")
+	rootCmd.Flags().StringVarP(&dbFile, "db-file", "f", "", "A file containing extracted unicode mapping in the form of [unicode] ; [description]")
 }
