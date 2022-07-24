@@ -4,15 +4,19 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"github.com/rgolangh/sluk/data"
-	"github.com/spf13/cobra"
 	"io"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/lithammer/fuzzysearch/fuzzy"
+	"github.com/rgolangh/sluk/data"
+	"github.com/spf13/cobra"
 )
 
 var (
+	verbose                 bool
 	exact                   bool
 	printUnicodeValue       bool
 	printUnicodeDescription bool
@@ -22,10 +26,11 @@ var (
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "sluk [search-term]",
-	Short: "sluk (simbol look up) will lookup a unicode simbol by name and print",
-	Long: `Sluk will lookup a simbol in the unicode map extracted from unicode.org
-and will print it the terminal. For example:
-sluk white heavy check mark
+	Short: "sluk (symbol look up) will lookup a unicode symbol by name and print",
+	Long: `Sluk will lookup (fuzzy search) the symbol description in the unicode
+map extracted from unicode.org and will print it the terminal. For example:
+$ sluk heavy check mark
+✔
 ✅
 `,
 	Args: func(cmd *cobra.Command, args []string) error {
@@ -43,8 +48,14 @@ func Execute() {
 	cobra.CheckErr(rootCmd.Execute())
 }
 
+type match struct {
+	rank        int
+	unicode     string
+	description string
+}
+
 func run(cmd *cobra.Command, args []string) {
-	results := map[string]string{}
+	var results []match
 	searchTerm := strings.ToUpper(strings.Join(args, " "))
 
 	var reader io.Reader
@@ -70,18 +81,25 @@ func run(cmd *cobra.Command, args []string) {
 		k, v := strings.TrimSpace(split[0]), strings.TrimSpace(split[1])
 		if exact {
 			if v == searchTerm {
-				results[k] = v
+				results = append(results, match{unicode: k, description: v})
 			}
 		} else {
-			if strings.Contains(v, searchTerm) {
-				results[k] = v
+			words := strings.Split(split[1], " ")
+			matches := fuzzy.RankFind(searchTerm, words)
+			sort.Sort(matches)
+
+			closestMatch := matches[0]
+			if len(matches) > 0 && closestMatch.Distance > -1 && closestMatch.Distance < 10 {
+				results = append(results, match{rank: closestMatch.Distance, unicode: k, description: v})
 			}
 		}
 	}
 
-	for code, desc := range results {
+	sort.SliceStable(results, func(i, j int) bool { return results[i].rank < results[j].rank })
+
+	for _, m := range results {
 		// pad the unicode value with zeros so it will be valid unicode hex value
-		s := fmt.Sprintf("'\\U%08s'", code)
+		s := fmt.Sprintf("'\\U%08s'", m.unicode)
 		unquote, err := strconv.Unquote(s)
 		cobra.CheckErr(err)
 		fmt.Printf("%s", unquote)
@@ -89,13 +107,17 @@ func run(cmd *cobra.Command, args []string) {
 			fmt.Printf("\t%s", s)
 		}
 		if printUnicodeDescription {
-			fmt.Printf("\t%s", desc)
+			fmt.Printf("\t%s", m.description)
 		}
 		fmt.Println()
+		if verbose {
+			fmt.Printf("%+v\n", m)
+		}
 	}
 }
 
 func init() {
+	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Print verbose and debug info")
 	rootCmd.Flags().BoolVarP(&exact, "exact-match", "e", false, "Exact match the search term")
 	rootCmd.Flags().BoolVarP(&printUnicodeValue, "print-unicode", "p", false, "Print the unicode value")
 	rootCmd.Flags().BoolVarP(&printUnicodeDescription, "print-description", "d", false, "Print the unicode description")

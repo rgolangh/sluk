@@ -1,5 +1,6 @@
 UNICODE_DB = "https://www.unicode.org/Public/14.0.0/ucd/extracted/DerivedName.txt"
 
+.PHONY: bin
 bin:
 	go build -o bin/sluk main.go
 
